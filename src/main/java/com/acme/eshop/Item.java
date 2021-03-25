@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.util.Objects;
 
 public class Item {
+	public Item() {
+	}
+
 	private String name;
 	private BigDecimal price;
 	private Integer quantity;
@@ -12,12 +15,12 @@ public class Item {
 
 
 
-	public Item(String name, BigDecimal price, Integer quantity, Long id) {
+/*	public Item(String name, BigDecimal price, Integer quantity, Long id) {
 		this.name = name;
 		this.price = price;
 		this.quantity = quantity;
 		this.id = id;
-	}
+	}*/
 
 	public String getName() {return name;	}
 

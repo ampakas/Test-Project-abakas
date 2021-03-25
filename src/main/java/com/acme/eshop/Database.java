@@ -3,6 +3,7 @@ package com.acme.eshop;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -11,6 +12,7 @@ import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static com.acme.eshop.Customer.CustomerType.*;
 import static java.lang.System.exit;
 
 
@@ -38,6 +40,14 @@ import static java.lang.System.exit;
         import static java.lang.System.exit;
 
 public class Database {
+
+    public enum CustomerType {
+        B2C, B2B, B2G;
+    }
+    public enum PaymentType {
+        CASH, CREDIT;
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(Database.class);
     private static final String DB_URL = "jdbc:h2:mem:sample";
     private static final String DB_USERNAME = "sa";
@@ -66,19 +76,108 @@ public class Database {
         // Insert data
         logger.info("INSERT PRODUCTS");
             eshop.insertProducts();
-        // Insert data in batch mode
-            //eshop.batchInsertData();
-            //eshop.selectData();
+        logger.info("INSERT CUSTOMERS");
+            eshop.insertCustomers();
 
-        // Update data
-            //eshop.updateData();
-            //eshop.selectData();
+        logger.info("1ST EXAMPLE");
+        ////////////////////////////////////////////////
+        Customer NewCustomer1 = new Customer();
 
-        // Delete data
-            //eshop.deleteData();
-            //eshop.selectData();
+        logger.info("SELECT CUSTOMER");
 
-            //eshop.selectData();
+        eshop.getCustomer(NewCustomer1, 1001);
+
+        OrderServiceImpl NewOrderService = new OrderServiceImpl();
+
+        Item firstItem = new Item();
+        eshop.getProduct(firstItem,101);
+        firstItem.setQuantity(1);
+        logger.info("firstItem name:{}.", firstItem.getName());
+
+        Item secondItem = new Item();
+        eshop.getProduct(secondItem,102);
+        secondItem.setQuantity(2);
+
+        NewOrderService.setCustomer(NewCustomer1);
+        NewOrderService.setPaymentType(PaymentType.CASH);
+
+        logger.info("SET CUSTOMER");
+        logger.info("firstItem name:{}.", firstItem.getName());
+        NewOrderService.addItem(firstItem);
+        logger.info("SET firstItem");
+        NewOrderService.addItem(secondItem);
+        logger.info("SET secondItem");
+
+        logger.info("TOTAL AMOUNT:{}.", NewOrderService.getTotalAmount());
+
+
+
+
+
+        logger.info("CUSTOMER id:{}, name:{}, type:{}.",
+                NewCustomer1.getId(),
+                NewCustomer1.getName(),
+                NewCustomer1.getType());
+
+        logger.info("INSERT ORDER TO DATABASE");
+        long currentOrder = eshop.setOrder(NewCustomer1,NewOrderService.getTotalAmount(),NewOrderService.getTotalQuantity());
+
+        logger.info("INSERT ORDER ITEMS TO DATABASE");
+        eshop.batchInsertOrders(NewOrderService.getOrder(),currentOrder  );
+
+        NewOrderService.checkout();
+
+
+/*
+        logger.info("1ST EXAMPLE");
+        ////////////////////////////////////////////////
+
+        Customer NewCustomer2 = new Customer();
+
+        logger.info("SELECT CUSTOMER");
+
+        eshop.getCustomer(NewCustomer2, 1003);
+
+        Item firstItem2 = new Item();
+        eshop.getProduct(firstItem2,100);
+        firstItem2.setQuantity(3);
+        logger.info("firstItem name:{}.", firstItem2.getName());
+
+        Item secondItem2 = new Item();
+        eshop.getProduct(secondItem2,103);
+        secondItem2.setQuantity(2);
+
+        NewOrderService.setCustomer(NewCustomer2);
+        NewOrderService.setPaymentType(PaymentType.CASH);
+
+        logger.info("SET CUSTOMER");
+        logger.info("firstItem name:{}.", firstItem2.getName());
+        NewOrderService.addItem(firstItem2);
+        logger.info("SET firstItem");
+        NewOrderService.addItem(secondItem2);
+        logger.info("SET secondItem");
+
+        logger.info("TOTAL AMOUNT:{}.", NewOrderService.getTotalAmount());
+
+
+
+
+
+        logger.info("CUSTOMER id:{}, name:{}, type:{}.",
+                NewCustomer2.getId(),
+                NewCustomer2.getName(),
+                NewCustomer2.getType());
+
+        logger.info("INSERT ORDER TO DATABASE");
+        long currentOrder2 = eshop.setOrder(NewCustomer2,NewOrderService.getTotalAmount(),NewOrderService.getTotalQuantity());
+
+        logger.info("INSERT ORDER ITEMS TO DATABASE");
+        eshop.batchInsertOrders(NewOrderService.getOrder(),currentOrder2  );
+
+
+*/
+
+
 
         Thread.sleep(30000);
 
@@ -173,6 +272,21 @@ public class Database {
         }
     }
 
+    private void insertCustomers() {
+        try (Statement statement = hikariDatasource.getConnection().createStatement()) {
+            int resultRows = statement.executeUpdate(sqlCommands.getProperty("insert.table.011"));
+            logger.debug("Statement returned {}.", resultRows);
+            logger.info("Statement returned {}.", resultRows);
+            resultRows = statement.executeUpdate(sqlCommands.getProperty("insert.table.012"));
+            logger.debug("Statement returned {}.", resultRows);
+            resultRows = statement.executeUpdate(sqlCommands.getProperty("insert.table.013"));
+            logger.debug("Statement returned {}.", resultRows);
+
+        } catch (SQLException throwables) {
+            logger.error("Error occurred while inserting data.", throwables);
+        }
+    }
+
     private void batchInsertData() {
         try (PreparedStatement preparedStatement = hikariDatasource.getConnection().prepareStatement(
                 sqlCommands.getProperty("insert.table.000"))) {
@@ -185,6 +299,61 @@ public class Database {
             logger.error("Error occurred while batch inserting data.", throwables);
         }
     }
+
+      private void getCustomer(Customer myCustomer, long customerID) /*throws SQLException*/ {
+        try (PreparedStatement  preparedStatement = hikariDatasource.getConnection().prepareStatement(
+                sqlCommands.getProperty("select.table.002"))) {
+            //try {
+            preparedStatement.setLong(1,customerID);
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            while (resultSet.next()) {
+                //@formatter:off
+                logger.info("CUSTOMER id:{}, name:{}, type:{}.",
+                        resultSet.getLong("ID"),
+                        resultSet.getString("NAME"),
+                        resultSet.getInt("TYPE"));
+
+                myCustomer.setId(resultSet.getLong("ID"));
+                myCustomer.setName(resultSet.getString("NAME"));
+                int customerType = (resultSet.getInt("TYPE"));
+                if (customerType == 1) {myCustomer.setType(B2C); break;}
+                else if (customerType == 2) {myCustomer.setType(B2B); break;}
+                else if (customerType == 3) myCustomer.setType(B2G);
+                //@formatter:on
+           // } catch (SQLException ) {
+          //          logger.error("Error occurred while retrieving data");
+                }
+        } catch (SQLException throwables) {
+            logger.error("Error occurred while retrieving data", throwables);
+        }
+    }
+
+
+    private void getProduct(Item myProduct, long ProductID) /*throws SQLException*/ {
+        try (PreparedStatement  preparedStatement = hikariDatasource.getConnection().prepareStatement(
+                sqlCommands.getProperty("select.table.003"))) {
+            //try {
+            preparedStatement.setLong(1,ProductID);
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            while (resultSet.next()) {
+                //@formatter:off
+                logger.info("PRODUCT id:{}, name:{}, price:{}.",
+                        resultSet.getLong("ID"),
+                        resultSet.getString("NAME"),
+                        resultSet.getBigDecimal("PRICE"));
+
+                myProduct.setId(resultSet.getLong("ID"));
+                myProduct.setName(resultSet.getString("NAME"));
+                myProduct.setPrice(resultSet.getBigDecimal("PRICE"));
+
+            }
+        } catch (SQLException throwables) {
+            logger.error("Error occurred while retrieving data", throwables);
+        }
+    }
+
 
     private void selectData() {
         try (Statement statement = hikariDatasource.getConnection().createStatement();
@@ -253,4 +422,67 @@ public class Database {
             preparedStatement.addBatch();
         }
     }
+
+    private long setOrder(Customer myCustomer, BigDecimal TotalAmount,  Integer TotalQuantity) /*throws SQLException*/ {
+        try (PreparedStatement  preparedStatement = hikariDatasource.getConnection().prepareStatement(
+                sqlCommands.getProperty("insert.table.020"))) {
+            long orderId = ThreadLocalRandom.current().nextLong(2000, 3000);
+            preparedStatement.setLong(1,orderId);
+            preparedStatement.setLong(2,myCustomer.getId());
+            preparedStatement.setLong(3,TotalQuantity);
+            preparedStatement.setBigDecimal(4,TotalAmount);
+            //ResultSet resultSet = preparedStatement.executeQuery();
+            int resultRows = preparedStatement.executeUpdate();
+
+            return orderId;
+        } catch (SQLException throwables) {
+            logger.error("Error occurred while retrieving data", throwables);
+            return 1;
+        }
+    }
+
+    private void batchInsertOrders(List orders, long orderId) {
+        try (PreparedStatement preparedStatement = hikariDatasource.getConnection().prepareStatement(
+                sqlCommands.getProperty("insert.table.030"))) {
+            generateOrdersData(preparedStatement, orders, orderId);
+
+            int[] affectedRows = preparedStatement.executeBatch();
+            logger.debug("Rows inserted {}.", Arrays.stream(affectedRows).sum());
+
+        } catch (SQLException throwables) {
+            logger.error("Error occurred while batch inserting data.", throwables);
+        }
+    }
+
+    private void generateOrdersData(PreparedStatement preparedStatement, List<Item> Orders, long orderId) throws SQLException {
+
+            for (Item order : Orders) {
+            preparedStatement.clearParameters();
+
+            preparedStatement.setLong(1, orderId);
+            preparedStatement.setLong(2, order.getId());
+            preparedStatement.setLong(3, order.getQuantity());
+            preparedStatement.addBatch();
+        }
+    }
+
+    private void averageOrdersCost() {
+        try (Statement statement = hikariDatasource.getConnection().createStatement();
+             ResultSet resultSet = statement.executeQuery(sqlCommands.getProperty("select.table.001"))) {
+
+            while (resultSet.next()) {
+                //@formatter:off
+                logger.info("id:{}, firstName:{}, lastName:{}, age:{}.",
+                        resultSet.getLong("ID"),
+                        resultSet.getString("FIRSTNAME"),
+                        resultSet.getString("LASTNAME"),
+                        resultSet.getInt("AGE"));
+                //@formatter:on
+            }
+        } catch (SQLException throwables) {
+            logger.error("Error occurred while retrieving data", throwables);
+        }
+    }
+
+
 }
